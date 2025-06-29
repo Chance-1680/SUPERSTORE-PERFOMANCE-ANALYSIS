@@ -1,0 +1,301 @@
+---
+title: Superstore Dataset - Data Cleaning and Preprocessing
+jupyter: python3
+---
+
+
+In this notebook, we focus on data preparation, cleaning, and preprocessing for the Superstore dataset, a comprehensive dataset often used for sales analysis, customer segmentation, and profit prediction tasks based on various order, product, and customer attributes.
+
+Good data preprocessing is crucial for reliable and interpretable results in business intelligence and analytics workflows. Here, I address common data issues such as missing values, duplicates, and inconsistent categorical labels, while creating derived features to improve downstream analysis.
+
+
+I start by importing essential Python libraries for data handling and manipulation.
+
+- `pandas` for structured data operations.
+
+- `numpy` for numerical operations.
+
+- `os` for interacting with the operating system and directory structures.
+
+```{python}
+import pandas as pd
+import numpy as np
+import os
+import io
+```
+
+## Define and Create Directory Paths
+
+To ensure reproducibility andorganized storage, we programmatically create directories for:
+
+- **raw data**
+- **processed data**
+- **results**
+- **documentation**
+
+These directories will store intermediate and final outputs for reproducibility.
+
+# Define and Create Paths
+
+```{python}
+# Get current working directory
+current_dir = os.getcwd()
+
+# Go one directory up (assuming script is inside a subfolder like 'notebooks')
+project_root_dir = os.path.dirname(current_dir)
+
+# Define key folder paths
+data_dir = os.path.join(project_root_dir, 'data')
+raw_dir = os.path.join(data_dir, 'raw')
+processed_dir = os.path.join(data_dir, 'processed')
+results_dir = os.path.join(project_root_dir, 'results')
+docs_dir = os.path.join(project_root_dir, 'docs')
+
+# Create directories if they don't exist
+os.makedirs(raw_dir, exist_ok=True)
+os.makedirs(processed_dir, exist_ok=True)
+os.makedirs(results_dir, exist_ok=True)
+os.makedirs(docs_dir, exist_ok=True)
+```
+
+## Load Datasets
+Three key datasets—'Orders', 'Returns', and 'People'—are loaded from the Superstore.xlsx Excel file into separate pandas DataFrames.
+
+```{python}
+# Define the full path to your Excel file
+excel_file_path = os.path.join(raw_dir, "Superstore.xlsx")
+
+# Load the individual sheets
+orders_df = pd.read_excel(excel_file_path, sheet_name='Orders')
+returns_df = pd.read_excel(excel_file_path, sheet_name='Returns')
+people_df = pd.read_excel(excel_file_path, sheet_name='People')
+
+ 
+print("\nOrders DataFrame Head:")
+print(orders_df.head())
+
+ 
+print("\nReturns DataFrame Head:")
+print(returns_df.head())
+
+ 
+print("\nPeople DataFrame Head:")
+print(people_df.head())
+```
+
+# Data Cleaning
+
+
+## 1.  Data Merging
+This section focuses on integrating the loaded datasets to create a unified DataFrame.
+
+### Merge Orders and Returns
+The 'Orders' DataFrame is merged with the 'Returns' DataFrame using a left join on 'Order ID'. This ensures that all order records are retained, and return information is added where available.
+
+```{python}
+# Merge returns into orders (left join to keep all orders)
+merged_df = pd.merge(orders_df, returns_df, on='Order ID', how='left')
+merged_df
+```
+
+## Merge with People Data: 
+The resulting merged DataFrame is then further merged with the 'People' DataFrame. This merge is performed using a left join on the 'Region' column, associating sales representatives with their respective regions.
+
+```{python}
+# Merge the result with people data (left join to preserve all order records)
+final_merged_df = pd.merge(merged_df, people_df, on='Region', how='left')
+final_merged_df
+```
+
+```{python}
+final_merged_df.isnull().sum()
+```
+
+```{python}
+final_merged_df.head(10)
+```
+
+```{python}
+final_merged_df.shape
+```
+
+```{python}
+final_merged_df.info()
+```
+
+## 2. Understanding the dataset
+Before proceeding with the cleaning, we would like to understand the variables deeply. This would help guide the cleaning process. The subsequent tables detail the types, meaning, and values or ranges of the variables in the Superstore dataset.
+
+**Table 1: Summary table of the variables in the dataset**
+
+
+| Variable      | Type        | Description                          | Values / Range (excluding NaN)                                      |
+| :------------ | :---------- | :----------------------------------- | :------------------------------------------------------------------ |
+| Order ID      | Categorical | Unique identifier for each order     | Unique alphanumeric codes                                           |
+| Order Date    | Date        | Date when the order was placed       | Dates ranging from 2014 to 2017                                     |
+| Ship Date     | Date        | Date when the order was shipped      | Dates ranging from 2014 to 2017                                     |
+| Ship Mode     | Categorical | Shipping method used                 | 'Second Class', 'Standard Class', 'First Class', 'Same Day'         |
+| Customer ID   | Categorical | Unique identifier for each customer  | Unique alphanumeric codes                                           |
+| Customer Name | Categorical | Name of the customer                 | Text names                                                          |
+| Segment       | Categorical | Customer segment                     | 'Consumer', 'Corporate', 'Home Office'                              |
+| Country       | Categorical | Country where the order was placed   | 'United States'                                                     |
+| City          | Categorical | City where the order was placed      | Various city names (e.g., 'New York City', 'Los Angeles')           |
+| State         | Categorical | State where the order was placed     | All 50 U.S. states and D.C.                                         |
+| Postal Code   | Numeric     | Postal code of the delivery address  | 10001 – 99301                                                       |
+| Region        | Categorical | Geographic region                    | 'East', 'Central', 'South', 'West'                                  |
+| Product ID    | Categorical | Unique identifier for each product   | Unique alphanumeric codes                                           |
+| Category      | Categorical | Main product category                | 'Furniture', 'Office Supplies', 'Technology'                        |
+| Sub-Category  | Categorical | Sub-category of the product          | 'Bookcases', 'Chairs', 'Phones', 'Storage'                    |
+| Product Name  | Categorical | Name of the product                  | Various product descriptions                                        |
+| Sales         | Numeric     | Sales amount for the product         | 0.444 – 22,638.48                                                   |
+| Quantity      | Numeric     | Quantity of the product ordered      | 1 – 14                                                              |
+| Discount      | Numeric     | Discount applied to the product      | 0.0 – 0.8                                                           |
+| Profit        | Numeric     | Profit generated from the product    | -6,599.978 – 8,399.976                                              |
+| Returned      | Categorical | Indicates if the order was returned  | 'Yes', 'No'                                                         |
+| Person        | Categorical | Sales manager responsible for region | 'Anna Andrus', 'Chuck Magee', 'Kelly Williams', 'Cassandra Brandow' |
+
+**Table 2: Categorical Variables Table**
+
+| Variable     | Unique Value             | Description                                                   |
+| :----------- | :----------------------- | :------------------------------------------------------------ |
+| Ship Mode    | Second Class             | Standard shipping, typically slower than First Class          |
+|              | Standard Class           | Most common and often slowest shipping option                 |
+|              | First Class              | Faster shipping option, quicker than Second Class             |
+|              | Same Day                 | Fastest shipping option, delivery on the same day             |
+| Segment      | Consumer                 | Individual customers purchasing for personal use              |
+|              | Corporate                | Business customers, typically mid-sized companies             |
+|              | Home Office              | Small business or work-from-home customers                    |
+| Category     | Furniture                | Products related to furniture                                 |
+|              | Office Supplies          | Products for office use                                       |
+|              | Technology               | Electronic devices and related accessories                    |
+| Returned     | Yes                      | The order was returned                                        |
+|              | No                       | The order was not returned                                    |
+| Person       | Anna Andrus              | Sales manager for a West region                               |
+|              | Chuck Magee              | Sales manager for a East region                               |
+|              | Kelly Williams           | Sales manager for a Central region                            |
+|              | Cassandra Brandow        | Sales manager for a South region                              |
+| State        | (Various US States)      | State where the order was placed (e.g., California, New York) |
+| Region       | East                     | Orders from the Eastern United States                         |
+|              | Central                  | Orders from the Central United States                         |
+|              | South                    | Orders from the Southern United States                        |
+|              | West                     | Orders from the Western United States                         |
+| Sub-Category | (Various Sub-Categories) | Detailed product classifications (e.g., 'Phones', 'Binders')  |
+
+
+```{python}
+print("\nUnique Ship Modes:")
+print(np.unique(final_merged_df['Ship Mode'].dropna().to_list()))
+```
+
+```{python}
+# Unique Segments
+print("\nUnique Segments:")
+print(np.unique(final_merged_df['Segment'].dropna().to_list()))
+```
+
+```{python}
+# Unique Categories
+print("\nUnique Categories:")
+print(np.unique(final_merged_df['Category'].dropna().to_list()))
+```
+
+```{python}
+# Unique Regions
+print("\nUnique Regions:")
+print(np.unique(final_merged_df['Region'].dropna().to_list()))
+```
+
+```{python}
+print("\nUnique Sub-Categories:")
+print(np.unique(final_merged_df['Sub-Category'].dropna().to_list()))
+```
+
+```{python}
+print("\nUnique States:")
+print(np.unique(final_merged_df['State'].dropna().to_list()))
+```
+
+```{python}
+print("\nUnique Returned Statuses:")
+print(np.unique(final_merged_df['Returned'].dropna().to_list()))
+```
+
+## 3. Deal with missing values
+
+### Handle Missing Values
+The 'Returned' column, which contained a significant number of missing values (NaN), is imputed by filling these entries with the string 'No'. This indicates that orders without a return record are considered not returned.
+
+   ###  Replace NaN in 'Returned' column with 'No'
+
+```{python}
+final_merged_df['Returned'] = final_merged_df['Returned'].fillna('No')
+final_merged_df
+```
+
+## 3. Convert Data Types
+
+ 
+### Create new feature: Shipping Duration in days
+The 'Order Date' and 'Ship Date' columns are converted to datetime objects, enabling proper chronological analysis and operations.
+
+```{python}
+final_merged_df['Shipping Duration'] = (
+    final_merged_df['Ship Date'] - final_merged_df ['Order Date']
+).dt.days
+final_merged_df
+```
+
+## 4. Extract order year and month for trend analysis
+This step creates two new columns—Order Year and Order Month by extracting the year and month from the Order Date column using pandas' .dt accessor. These variables are useful for performing time-based trend analysis, such as identifying seasonal patterns or yearly growth in sales.
+
+```{python}
+final_merged_df['Order Year'] = final_merged_df['Order Date'].dt.year
+final_merged_df['Order Month'] = final_merged_df['Order Date'].dt.month
+final_merged_df
+```
+
+## 5. Trim text columns of leading/trailing whitespace  
+This step ensures the consistency and cleanliness of textual data by removing any unnecessary leading or trailing whitespace from string-type columns. This is a crucial universal cleanup practice that prevents issues during data analysis, filtering, or merging operations caused by subtle differences in string values due to whitespace.
+
+### The process involves:
+
+- Identifying Text Columns: All columns with an 'object' data type (typically representing strings) are selected from the final_merged_df.
+- Applying Whitespace Trim: For each identified text column, the .str.strip() method is applied to every string entry. This method efficiently removes any spaces, tabs, or newlines from the beginning and end of the text, standardizing the data.
+
+```{python}
+text_cols = final_merged_df.select_dtypes(include='object').columns
+final_merged_df[text_cols] = final_merged_df[text_cols].apply(lambda x: x.str.strip())
+final_merged_df
+```
+
+```{python}
+final_merged_df.isnull().sum()
+```
+
+## 6. Deal with Duplicates
+
+Duplicate rows across the entire DataFrame are identified and removed to ensure data uniqueness and integrity. The process confirms that no duplicate entries remain after this operation, resulting in a cleaned DataFrame of (9994, 26) dimensions.
+
+```{python}
+final_merged_df.duplicated().sum()
+```
+
+```{python}
+final_merged_df.shape
+```
+
+##  Save the Cleaned DataFrame to a CSV file
+
+The final step involves persisting the cleaned and merged dataset for future use.
+
+Export to CSV: The final_merged_df, now cleaned and preprocessed, is saved as 'final_superstore_cleaned.csv' within the designated 'processed data' directory. The 'index=False' argument ensures that the DataFrame index is not written to the CSV file.
+
+```{python}
+# Define the full path for the output CSV
+output_file = os.path.join(processed_dir, 'final_superstore_cleanedd.csv')
+
+# Save the cleaned DataFrame
+final_merged_df.to_csv(output_file, index=False)
+```
+
+
